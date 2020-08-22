@@ -1,0 +1,52 @@
+version: '3.4'
+
+services:
+  geth:
+    image: ethereum/client-go
+    command: --goerli --nousb --ws --wsaddr "0.0.0.0" --rpc --rpcaddr "0.0.0.0" --rpcvhosts=*
+    networks: 
+      - mesh
+    volumes: 
+      - geth:/root/.ethereum
+  
+  nbc:
+    depends_on: 
+      - geth
+    networks: 
+      - mesh
+    build:
+      context: ./
+    volumes: 
+      - ./data:/root/nbc/build
+      - nimcache:/root/nbc/nimcache
+    ports:
+      - 50000:50000
+      - 8008:8008
+    command: make GOERLI_WEB3_URL=ws://geth:8545 NODE_PARAMS="--nat:\"extip:$EXT_IP_ADDRESS\" --metrics-address=\"0.0.0.0\"" NIM_PARAMS="-d:insecure -d:metrics" LOG_LEVEL="INFO" BASE_PORT=50000 NODE_ID=0 medalla
+
+  metrics:
+    depends_on: 
+      - nbc
+    volumes: 
+      - ./data:/root/nbc/build
+    networks: 
+      - mesh
+    image: prom/prometheus
+    user: root
+    command: --config.file=/root/nbc/build/data/shared_medalla_0/prometheus.yml
+  
+  grafana:
+    depends_on:
+      - metrics
+    networks: 
+      - mesh
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+networks: 
+  mesh:
+
+volumes: 
+  geth:
+  nimcache:
